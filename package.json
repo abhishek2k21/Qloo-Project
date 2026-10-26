@@ -1,0 +1,22 @@
+{
+  "name": "tastebrief",
+  "version": "0.1.0",
+  "private": true,
+  "description": "TasteBrief — a Qloo-grounded taste-gap agent for brand & creative teams. Built for the Qloo Agentic Hackathon.",
+  "type": "module",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "next": "^15.1.0",
+    "openai": "^4.77.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  }
+}
