@@ -87,6 +87,7 @@ export async function POST(req) {
 
   return NextResponse.json({
     mock: agent.mock,
+    mockReason: agent.mockReason || null,
     steps: agent.steps,
     errors: agent.errors,
     briefContext: agent.briefContext,
@@ -94,10 +95,14 @@ export async function POST(req) {
     bareLlm: bare,
     groundedLlm: grounded,
     llmLive: hasLlm(),
+    // qlooLive is true only when we ran live AND got real data. When the
+    // live call was empty the agent flips to mock, so this is honest.
     qlooLive: !agent.mock && hasQlooKey(),
     qlooKeyConfigured: hasQlooKey(),
     modeNote:
-      agent.mock && hasQlooKey()
+      agent.mock && agent.mockReason
+        ? agent.mockReason
+        : agent.mock && hasQlooKey()
         ? "Qloo calls failed at runtime; served by disclosed mock backend."
         : agent.mock
         ? "No QLOO_API_KEY configured; served by disclosed mock Qloo backend."
