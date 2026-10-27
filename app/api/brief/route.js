@@ -36,6 +36,7 @@ export async function POST(req) {
   const query = {
     goal: (body.goal || "").trim(),
     brand: (body.brand || "").trim(),
+    entityQuery: (body.brand || body.goal || "").trim(),
     audience: (body.audience || "").trim(),
     tagQuery: (body.tagQuery || "").trim(),
     location: (body.location || "").trim() || undefined,
