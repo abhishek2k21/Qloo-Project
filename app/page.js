@@ -122,7 +122,7 @@ export default function Home() {
         <p className="sub">
           A taste-gap agent for brand &amp; creative leads. Enter a target
           audience and a goal — the agent resolves entities, audiences, and
-          tags on <strong>Qloo's taste graph</strong>, pulls insights
+          tags on <strong>Qloo&apos;s taste graph</strong>, pulls insights
           (and heatmaps), and writes a taste brief: affinities, where the
           audience is, and messaging angles. Every answer is shown
           side-by-side against what a <em>bare LLM</em> would say without

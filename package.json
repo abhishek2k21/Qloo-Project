@@ -11,12 +11,18 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "eslint .",
+    "test": "node --test"
   },
   "dependencies": {
     "next": "^15.1.0",
-    "openai": "^4.77.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9",
+    "eslint": "^9",
+    "eslint-plugin-react": "^7.37.0",
+    "globals": "^15"
   }
 }
