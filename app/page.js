@@ -1,9 +1,12 @@
 "use client";
 
 import { useState } from "react";
+import { qlooBadge, llmBadge } from "../lib/ui-state.js";
 
 const PRESETS = [
   {
+    brief:
+      "Launch an indie-music zine to urban creatives who love vinyl. Recommend artists, venues, and messaging angles that resonate.",
     goal: "Launch an indie-music zine to urban creatives who love vinyl",
     brand: "Miles Davis",
     audience: "indie music",
@@ -11,6 +14,8 @@ const PRESETS = [
     location: "",
   },
   {
+    brief:
+      "Position a skincare brand with urban creatives who follow Aesop. Recommend affinities, geographic hotspots, and angles.",
     goal: "Position a skincare brand with urban creatives who follow Aesop",
     brand: "Aesop",
     audience: "urban creatives",
@@ -18,6 +23,8 @@ const PRESETS = [
     location: "Los Angeles",
   },
   {
+    brief:
+      "Pitch a neo-noir streaming original to cinephile 25-34s. Recommend comparable films, directors, and cultural touchpoints.",
     goal: "Pitch a neo-noir streaming original to cinephile 25-34s",
     brand: "Parasite",
     audience: "film buffs",
@@ -26,14 +33,13 @@ const PRESETS = [
   },
 ];
 
-function Badge({ kind, label }) {
-  const cls =
-    kind === "live"
-      ? "badge live"
-      : kind === "mock"
-      ? "badge mock"
-      : "badge";
-  return <span className={cls}>{label}</span>;
+function QlooBadge({ res }) {
+  const b = qlooBadge(res);
+  return <span className={`badge ${b.kind}`}>{b.label}</span>;
+}
+function LLMBadge({ res }) {
+  const b = llmBadge(res);
+  return <span className={`badge ${b.kind}`}>{b.label}</span>;
 }
 
 function Chips({ items, heat }) {
@@ -72,10 +78,11 @@ function StepList({ steps }) {
 
 export default function Home() {
   const [form, setForm] = useState({
-    goal: PRESETS[0].goal,
-    brand: PRESETS[0].brand,
-    audience: PRESETS[0].audience,
-    tagQuery: PRESETS[0].tagQuery,
+    brief: PRESETS[0].brief || "",
+    goal: "",
+    brand: "",
+    audience: "",
+    tagQuery: "",
     location: "",
     withHeatmap: true,
   });
@@ -95,10 +102,14 @@ export default function Home() {
     setError("");
     setRes(null);
     try {
+      const body = { brief: form.brief, withHeatmap: form.withHeatmap };
+      for (const k of ["goal", "brand", "audience", "tagQuery", "location"]) {
+        if (form[k]) body[k] = form[k];
+      }
       const r = await fetch("/api/brief", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...form, withHeatmap: form.withHeatmap }),
+        body: JSON.stringify(body),
       });
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || `HTTP ${r.status}`);
@@ -111,9 +122,9 @@ export default function Home() {
   }
 
   const q = res?.briefContext;
-  const topAffinities = q?.insights?.entities?.slice(0, 6) || [];
   const heatSpots = q?.heatmap?.entities?.slice(0, 6) || [];
-  const tags = q?.insights?.tags?.slice(0, 10) || [];
+  const heatStep = res?.steps?.find((s) => s.name === "heatmapInsights");
+  const heatSkipped = heatStep?.detail?.startsWith("Skipped");
 
   return (
     <div className="app">
@@ -129,9 +140,8 @@ export default function Home() {
           Qloo.
         </p>
         <div className="badges">
-          <Badge kind="mock" label={`Qloo: ${res ? (res.qlooLive ? "live" : "disclosed mock") : "idle"}`} />
-          <Badge kind="mock" label={`LLM: ${res ? (res.llmLive ? "live" : "template") : "idle"}`} />
-          <Badge kind="mock" label="Qloo Agentic Hackathon entry" />
+          <QlooBadge res={res} />
+          <LLMBadge res={res} />
         </div>
       </div>
 
@@ -142,28 +152,42 @@ export default function Home() {
           the right Qloo entity type (artist / brand / movie / place …),
           then runs five tool steps before writing the brief.
         </p>
-        <div className="grid cols-2">
-          <div style={{ gridColumn: "1 / -1" }}>
-            <label>Goal / brief</label>
-            <textarea rows={2} value={form.goal} onChange={set("goal")} />
-          </div>
-          <div>
-            <label>Entity to anchor on (artist / brand / place …)</label>
-            <input value={form.brand} onChange={set("brand")} placeholder="Miles Davis" />
-          </div>
-          <div>
-            <label>Target audience (a Qloo audience phrase)</label>
-            <input value={form.audience} onChange={set("audience")} placeholder="indie music" />
-          </div>
-          <div>
-            <label>Interest keywords (tag search)</label>
-            <input value={form.tagQuery} onChange={set("tagQuery")} placeholder="indie" />
-          </div>
-          <div>
-            <label>City (optional)</label>
-            <input value={form.location || ""} onChange={set("location")} placeholder="Los Angeles" />
-          </div>
+        <div style={{ gridColumn: "1 / -1" }}>
+          <label>Describe your brief</label>
+          <textarea
+            rows={3}
+            value={form.brief}
+            placeholder="e.g. Sell hiking boots to retirees in Denver"
+            onChange={set("brief")}
+          />
         </div>
+        <details className="fine-tune" style={{ marginTop: 12 }}>
+          <summary style={{ cursor: "pointer", color: "var(--accent-2)" }}>
+            Fine-tune (optional overrides)
+          </summary>
+          <div className="grid cols-2" style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid var(--line)" }}>
+            <div>
+              <label>Goal</label>
+              <input value={form.goal} onChange={set("goal")} placeholder="optional" />
+            </div>
+            <div>
+              <label>Entity to anchor on</label>
+              <input value={form.brand} onChange={set("brand")} placeholder="optional" />
+            </div>
+            <div>
+              <label>Target audience</label>
+              <input value={form.audience} onChange={set("audience")} placeholder="optional" />
+            </div>
+            <div>
+              <label>Interest keywords</label>
+              <input value={form.tagQuery} onChange={set("tagQuery")} placeholder="optional" />
+            </div>
+            <div style={{ gridColumn: "1 / -1" }}>
+              <label>City (optional, for heatmap)</label>
+              <input value={form.location || ""} onChange={set("location")} placeholder="Denver" />
+            </div>
+          </div>
+        </details>
         <div className="row">
           <input id="hm" type="checkbox" checked={form.withHeatmap}
             onChange={set("withHeatmap")} />
@@ -183,6 +207,7 @@ export default function Home() {
               }}
               onClick={() =>
                 setForm({
+                  brief: p.brief || "",
                   goal: p.goal,
                   brand: p.brand,
                   audience: p.audience,
@@ -214,45 +239,141 @@ export default function Home() {
           <div className="card">
             <h2>Agent trace</h2>
             <p className="hint">
-              Five tool steps. Each one is a real Qloo call (or its disclosed
-              mock). The brief only runs after the agent has resolved real
-              entity, audience, and tag URIs.
+              Each step is a real Qloo call (or its disclosed mock). The
+              brief runs only after the agent resolves entity, audience, and
+              tag URIs.
             </p>
             <StepList steps={res.steps} />
-          </div>
-
-          <div className="card">
-            <h2>Taste brief — where the audience is, what they cluster around</h2>
-            <p className="hint">
-              Affinities, recurring taste markers, and geographic hotspots,
-              all sourced from the Qloo digest the agent just assembled.
-            </p>
-            <div>
-              <label>Top affinities</label>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                {topAffinities.length
-                  ? topAffinities.map((e, i) => (
-                      <span key={i} className="chip">
-                        {e.name}
-                        {typeof e.popularity === "number"
-                          ? ` · ${(e.popularity * 100).toFixed(0)}%`
-                          : ""}
-                      </span>
-                    ))
-                  : <span className="empty">none resolved</span>}
-              </div>
-            </div>
-            <div style={{ marginTop: 10 }}>
-              <label>Recurring taste markers</label>
-              <Chips items={tags} />
-            </div>
-            {form.withHeatmap ? (
-              <div style={{ marginTop: 10 }}>
-                <label>Where they are (heatmap)</label>
-                <Chips items={heatSpots.map((e) => e.name)} heat />
+            {res.relaxations?.length ? (
+              <div
+                style={{
+                  marginTop: 10,
+                  padding: 10,
+                  background: "var(--panel-2)",
+                  border: "1px solid var(--line)",
+                  borderRadius: 10,
+                }}
+              >
+                <label
+                  style={{
+                    fontSize: 12,
+                    color: "var(--muted)",
+                    display: "block",
+                    marginBottom: 6,
+                  }}
+                >
+                  Replan — signal relaxed
+                </label>
+                {res.relaxations.map((note, i) => (
+                  <div
+                    key={i}
+                    className="chip"
+                    style={{ display: "inline-block", marginRight: 6 }}
+                  >
+                    {note}
+                  </div>
+                ))}
               </div>
             ) : null}
           </div>
+
+          {res.emptyReason ? (
+            <div className="card">
+              <h2>No matches yet</h2>
+              <p className="hint">{res.emptyReason}</p>
+              <p style={{ color: "var(--muted)", fontSize: 13 }}>
+                Try broadening the brief, for example &quot;Sell hiking boots
+                to retirees in Denver&quot;, &quot;Launch a skincare line for
+                urban creatives&quot;, or &quot;Pitch a neo-noir film to
+                cinephile 25-34s&quot;.
+              </p>
+            </div>
+          ) : null}
+
+          {!res.emptyReason && (
+            <div className="card">
+              <h2>Taste brief — where the audience is, what they cluster around</h2>
+              <p className="hint">
+                Affinities and taste markers, all sourced from the Qloo digest
+                the agent just assembled.
+              </p>
+              {res.citationAudit && (
+                <p
+                  style={{
+                    fontSize: 12,
+                    color: "var(--muted)",
+                    marginBottom: 10,
+                  }}
+                >
+                  {res.citationAudit.verified} of{" "}
+                  {res.citationAudit.total} citations verified against Qloo
+                  data
+                </p>
+              )}
+              <div
+                className="grid"
+                style={{
+                  gridTemplateColumns:
+                    "repeat(auto-fill, minmax(260px, 1fr))",
+                  gap: 14,
+                  marginTop: 12,
+                }}
+              >
+                {Object.entries(
+                  res.briefContext?.insightsByType || {}
+                ).map(([urn, digest]) => {
+                  const label = urn
+                    .replace("urn:entity:", "")
+                    .replace(/_/g, " ");
+                  const title =
+                    label.charAt(0).toUpperCase() + label.slice(1);
+                  return (
+                    <div key={urn} className="card" style={{ padding: 12 }}>
+                      <h3 style={{ margin: "0 0 8px", fontSize: 14 }}>
+                        {title}
+                      </h3>
+                      <div
+                        style={{
+                          display: "flex",
+                          flexWrap: "wrap",
+                          gap: 6,
+                        }}
+                      >
+                        {(digest.entities || [])
+                          .slice(0, 6)
+                          .map((e, i) => (
+                            <span key={i} className="chip">
+                              {e.name}
+                            </span>
+                          ))}
+                        {(digest.entities || []).length === 0 && (
+                          <span className="empty">none resolved</span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+                {Object.keys(
+                  res.briefContext?.insightsByType || {}
+                ).length === 0 && (
+                  <span className="empty">no taste entities resolved</span>
+                )}
+              </div>
+              {form.withHeatmap && (
+                <div style={{ marginTop: 10 }}>
+                  <label>Where they are (heatmap)</label>
+                  {heatSkipped ? (
+                    <span className="empty">
+                      Heatmap skipped — add a city to see where this audience
+                      concentrates.
+                    </span>
+                  ) : (
+                    <Chips items={heatSpots.map((e) => e.name)} heat />
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="card">
             <h2>Bare LLM vs Qloo-grounded</h2>
