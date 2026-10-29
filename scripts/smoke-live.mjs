@@ -4,9 +4,12 @@
  * Two modes:
  *
  *   1. `node scripts/smoke-live.mjs --types`   (needs QLOO_API_KEY)
- *      For each URN in ENTITY_TYPES, resolves one tag via /v2/tags, then
- *      calls /v2/insights with take=1 + that tag. Prints `urn -> HTTP status`
- *      per type. Exits 1 if any status is 400. Settles finding F10.
+ *      Resolves one tag via /v2/tags, then for each URN in ENTITY_TYPES
+ *      calls /v2/insights with take=1 + that tag. Prints `urn -> HTTP
+ *      status` per type. If the FIRST /v2/tags call returns 401/403 the
+ *      key is rejected and the script prints "KEY REJECTED" and exits 1
+ *      immediately (no per-type calls). Otherwise it exits 1 unless every
+ *      status is 2xx. Settles finding F10.
  *
  *   2. `node scripts/smoke-live.mjs --url <origin>`
  *      POSTs the three presets plus "Sell hiking boots to retirees" to
@@ -17,6 +20,7 @@
  */
 
 import { ENTITY_TYPES } from "../lib/entity-types.js";
+import { pathToFileURL } from "node:url";
 
 const BASE =
   process.env.QLOO_BASE_URL || "https://hackathon.api.qloo.com";
@@ -32,6 +36,33 @@ async function fetchJson(url, init) {
   return { res, body };
 }
 
+/** A 401 or 403 on the first /v2/tags call means the key was rejected. */
+export function isKeyRejected(status) {
+  return status === 401 || status === 403;
+}
+
+/** True only for 2xx statuses (the gate for --types to pass). */
+export function isPassStatus(status) {
+  return status >= 200 && status < 300;
+}
+
+/**
+ * The human-readable gate line for a --types run. A 401/403 anywhere (which
+ * in practice is the first call) means the key was rejected; otherwise a
+ * non-2xx run is a failure but NOT "all OK".
+ * @param {number[]} statuses
+ * @returns {string}
+ */
+export function typesGateMessage(statuses) {
+  if (statuses.some(isKeyRejected)) {
+    return "KEY REJECTED — 401/403 from Qloo; fix QLOO_API_KEY.";
+  }
+  if (statuses.some((s) => !isPassStatus(s))) {
+    return "Some entity types did not return 2xx — exiting 1.";
+  }
+  return "All entity types OK.";
+}
+
 async function resolveOneTag(key) {
   // Resolve a generic tag so every insights call carries "plus one resolved
   // tag" as the smoke spec requires.
@@ -43,7 +74,14 @@ async function resolveOneTag(key) {
     headers: { "X-Api-Key": key },
     cache: "no-store",
   });
-  if (!res.ok) return null;
+  if (isKeyRejected(res.status)) {
+    console.error(`KEY REJECTED — /v2/tags returned ${res.status}; aborting.`);
+    process.exit(1);
+  }
+  if (!res.ok) {
+    console.error(`/v2/tags returned ${res.status}; continuing without a tag.`);
+    return null;
+  }
   const tags = body?.results?.tags || [];
   const t = tags[0];
   if (!t) return null;
@@ -51,8 +89,9 @@ async function resolveOneTag(key) {
 }
 
 async function runTypes(key) {
+  // The tag call doubles as the key check: a 401/403 aborts immediately.
   const tag = await resolveOneTag(key);
-  let failed = false;
+  const statuses = [];
   for (const urn of ENTITY_TYPES) {
     const params = {
       "filter.type": urn,
@@ -64,14 +103,16 @@ async function runTypes(key) {
       headers: { "X-Api-Key": key },
       cache: "no-store",
     });
+    statuses.push(res.status);
     console.log(`${urn} -> ${res.status}`);
-    if (res.status === 400) failed = true;
   }
-  if (failed) {
-    console.error("\nSome entity types returned 400 from /v2/insights.");
-    process.exit(1);
+  const gate = typesGateMessage(statuses);
+  if (statuses.every(isPassStatus)) {
+    console.log(`\n${gate}`);
+    return;
   }
-  console.log("\nAll entity types OK.");
+  console.error(`\n${gate}`);
+  process.exit(1);
 }
 
 function presetBody(brief) {
@@ -129,26 +170,34 @@ async function runUrl(origin) {
   console.log("\nLive smoke test passed.");
 }
 
-const args = process.argv.slice(2);
-const mode = args[0];
+// ESM entry-point guard so importing the helpers (tests/smoke.test.js) does
+// not trigger the CLI side-effects below.
+const isMain = process.argv[1]
+  ? import.meta.url === pathToFileURL(process.argv[1]).href
+  : false;
 
-if (mode === "--types") {
-  const key = process.env.QLOO_API_KEY;
-  if (!key) {
-    console.error("QLOO_API_KEY is required for --types mode.");
+if (isMain) {
+  const args = process.argv.slice(2);
+  const mode = args[0];
+
+  if (mode === "--types") {
+    const key = process.env.QLOO_API_KEY;
+    if (!key) {
+      console.error("QLOO_API_KEY is required for --types mode.");
+      process.exit(1);
+    }
+    await runTypes(key);
+  } else if (mode === "--url") {
+    const origin = args[1];
+    if (!origin) {
+      console.error("Usage: node scripts/smoke-live.mjs --url <origin>");
+      process.exit(1);
+    }
+    await runUrl(origin);
+  } else {
+    console.error(
+      'Usage: node scripts/smoke-live.mjs --types   |   node scripts/smoke-live.mjs --url <origin>'
+    );
     process.exit(1);
   }
-  await runTypes(key);
-} else if (mode === "--url") {
-  const origin = args[1];
-  if (!origin) {
-    console.error("Usage: node scripts/smoke-live.mjs --url <origin>");
-    process.exit(1);
-  }
-  await runUrl(origin);
-} else {
-  console.error(
-    'Usage: node scripts/smoke-live.mjs --types   |   node scripts/smoke-live.mjs --url <origin>'
-  );
-  process.exit(1);
 }
