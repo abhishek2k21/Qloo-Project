@@ -98,3 +98,37 @@ test("success returns relaxations, citationAudit, qlooLive fields", async () => 
   assert.ok("citationAudit" in body);
   assert.equal(typeof body.qlooLive, "boolean");
 });
+
+// Task 4: llmLive must reflect the actual LLM source, not just key presence.
+test("llmLive is true when both LLM sources are openai", async () => {
+  const { deps: d } = makeDeps();
+  const deps = {
+    ...d,
+    generateBare: async () => ({ source: "openai", text: "b" }),
+    generateGrounded: async () => ({ source: "openai", text: "g" }),
+  };
+  const body = await (await handleBriefRequest(req({ goal: "g" }), deps)).json();
+  assert.equal(body.llmLive, true);
+});
+
+test("llmLive is false when the text came from the template", async () => {
+  const { deps: d } = makeDeps();
+  const deps = {
+    ...d,
+    generateBare: async () => ({ source: "template (no OPENAI_API_KEY)", text: "b" }),
+    generateGrounded: async () => ({ source: "template (no OPENAI_API_KEY)", text: "g" }),
+  };
+  const body = await (await handleBriefRequest(req({ goal: "g" }), deps)).json();
+  assert.equal(body.llmLive, false);
+});
+
+test("llmLive is false when only one LLM source is template", async () => {
+  const { deps: d } = makeDeps();
+  const deps = {
+    ...d,
+    generateBare: async () => ({ source: "openai", text: "b" }),
+    generateGrounded: async () => ({ source: "template (no OPENAI_API_KEY)", text: "g" }),
+  };
+  const body = await (await handleBriefRequest(req({ goal: "g" }), deps)).json();
+  assert.equal(body.llmLive, false);
+});
