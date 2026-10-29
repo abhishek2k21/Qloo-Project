@@ -89,6 +89,17 @@ test("brief field triggers parseBrief once", async () => {
   assert.equal(calls.parseBrief, 1);
 });
 
+test("LLM parseBrief returns tags as a string (no crash)", async () => {
+  // parseBriefWithLlm returns tags as a comma-separated string, not an array.
+  const { deps: d } = makeDeps();
+  const deps = {
+    ...d,
+    parseBrief: () => ({ goal: "g", audience: "a", location: "", tags: "vinyl, jazz" }),
+  };
+  const res = await handleBriefRequest(req({ brief: "x" }), deps);
+  assert.equal(res.status, 200);
+});
+
 test("success returns relaxations, citationAudit, qlooLive fields", async () => {
   const { deps } = makeDeps();
   const res = await handleBriefRequest(req({ goal: "g" }), deps);
