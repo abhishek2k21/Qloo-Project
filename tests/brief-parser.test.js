@@ -37,3 +37,24 @@ test("collects interest tags", () => {
   assert.ok(r.tags.includes("vinyl"));
   assert.ok(r.tags.includes("jazz"));
 });
+
+// Task 2: "Sell hiking boots to retirees" — "to retirees" is the audience,
+// and the sentence-initial verb "Sell" must never become a brand query.
+test('Sell hiking boots to retirees -> audience "retirees", no brand', () => {
+  const r = parseBrief("Sell hiking boots to retirees");
+  assert.equal(r.audience, "retirees");
+  assert.equal(r.brand, undefined);
+  assert.equal(r.goal, "Sell hiking boots to retirees");
+});
+
+test("sentence-initial capitalised word is never a brand query", () => {
+  const r = parseBrief("Sell Nike sneakers to joggers in LA");
+  // "Sell" is sentence-initial; the only brand signal here is "Nike", which
+  // is mid-sentence and capitalised, so it may become the entity query.
+  assert.equal(r.brand, "Nike");
+});
+
+test("mid-sentence capitalised name becomes a brand query", () => {
+  const r = parseBrief("Position a skincare brand with urban creatives who follow Aesop");
+  assert.equal(r.brand, "Aesop");
+});
